@@ -8,6 +8,14 @@ A Python package for handling and processing EIGENSTRAT datasets with advanced p
 filtering, and statistical analysis. With optimised I/O operations, it handles large genomic datasets with high
 performance.
 
+> Compatibility Notes
+> 
+> `pygenstrat` outputs are fully compatible with ADMIXTOOLS and EIGENSOFT workflows with two exceptions:
+>
+>1. **Hash validation**: When using pygenstrat-generated ANCESTRYMAP files with ADMIXTOOLS/EIGENSOFT, add `hashcheck: NO` to your parameter file, as pygenstrat cannot replicate convertf's undocumented hash system.
+>2. **TGENO format**: The transposed binary EIGENSTRAT format (TGENO) is not currently supported.
+
+
 ## EIGENSTRAT File Formats
 
 `pygenstrat` supports both **EIGEN format** (text-based) and **ANC format** (binary)
@@ -171,6 +179,7 @@ source ~/.zshrc
 | `--random-haploidise` | Convert heterozygous genotypes to homozygous at random                                                                                                                                          | flag                     | False        |
 | `--polarise`          | Polarisation reference: either a two-column file mapping snpID to ancestral_allele, or a sample ID from the dataset to use as ancestral reference (makes allele1 ancestral and allele2 derived) | filename or str          | None         |
 | `--flip-strand`       | File containing SNPs to convert to their complementary bases (swapped to the opposite DNA strand)                                                                                               | filename                 | None         |
+| `--seed`              | Random seed (used with --random-haploidise). If not specified, a random seed will be generated. | int                      | None         |
 
 ## Processing Order
 

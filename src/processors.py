@@ -9,6 +9,12 @@ from .io_handlers import backup_file, safe_remove
 
 #### update
 def apply_update(ind_data, snp_data, config, in_place=False):
+    """
+    Apply updates to individual and SNP data.
+    
+    Handles: population updates, SNP ID updates, genetic distance updates, strand flipping.
+    Can operate in-place (modifying files) or return updated data.
+    """
     changes_made = False
     if config.update_ind:
         updated_ind_data = update_individual_populations(ind_data, config.update_ind)
@@ -59,6 +65,10 @@ def apply_update(ind_data, snp_data, config, in_place=False):
         return ind_data, snp_data, changes_made
 
 def update_individual_populations(ind_data, update_file_path):
+    """
+    Update population labels for individuals.
+    File format: two columns (individual_id, new_population_name).
+    """
     try:
         update_df = pd.read_csv(
             update_file_path,
@@ -86,6 +96,10 @@ def update_individual_populations(ind_data, update_file_path):
         raise
 
 def update_snp_ids(snp_data, update_file_path):
+    """
+    Update SNP ID
+    File format: two columns (old_snp_id, new_snp_id).
+    """
     try:
         update_df = pd.read_csv(
             update_file_path,
@@ -111,6 +125,12 @@ def update_snp_ids(snp_data, update_file_path):
         raise
 
 def load_genetic_map(genetic_map):
+    """
+    Load genetic map from file and create interpolation functions.
+    
+    Returns chromosome-specific genetic maps and interpolation functions
+    for converting physical positions (bp) to genetic distances (cM).
+    """
     try:
         with open(genetic_map, 'r') as f:
             first_line = f.readline().strip()
@@ -164,6 +184,12 @@ def load_genetic_map(genetic_map):
         raise
 
 def update_genetic_distances(snp_chunk, interpolators=None, output_unit='cM', force_zero=False):
+    """
+    Update genetic distances using interpolation from a genetic map.
+    
+    Interpolates centiMorgan (cM) positions from physical positions (bp)
+    either in centiMorgans (cM) or Morgans (M).
+    """
     if force_zero:
         snp_chunk['cM'] = 0
         logging.info(f"Set genetic distances (cM) to 0 for all {len(snp_chunk)} SNPs (force_zero mode)")
@@ -310,6 +336,10 @@ def log_female_y(config):
             f"INFO: Set {config._male_x_het_count} non-female heterozygous X chromosome genotypes to missing.")
 
 def apply_sex_chr_missing(geno, snp_data, ind_data, config, sex_chr_info=None):
+    """
+    - X chromosome: set male heterozygous genotypes to missing
+    - Y chromosome: set non-male genotypes to missing 
+    """
     if (config is None or not config.sex_chr_missing or config.ignore_sex_chr or
             ind_data is None or snp_data is None):
         return geno.copy()
@@ -357,6 +387,9 @@ def apply_sex_chr_missing(geno, snp_data, ind_data, config, sex_chr_info=None):
 
 #### indv filtering
 def filter_individuals(ind_data, config):
+    """
+    Filter individuals based on keep/remove lists for individuals or populations.
+    """
     indv_mask = np.ones(len(ind_data), dtype=bool)
     # individual level
     if config.keep_indv:
@@ -380,6 +413,9 @@ def filter_individuals(ind_data, config):
 
 #### snp filtering
 def filter_snps(geno_chunk, snp_chunk, config, snp_filter_list=None, regions=None, chromosomes=None):
+    """
+    Filter SNPs based on chromosome, SNP ID, or genomic region criteria.
+    """
     need_filtering = False
     n_snps_original = len(snp_chunk)
     if config.keep_chr and chromosomes is not None:
@@ -555,6 +591,9 @@ def filter_by_chromosomes(snp_chunk, chromosomes, keep=True):
 
 #### transform
 def random_haploidise(geno):
+    """
+    Randomly convert heterozygous genotypes (1) to homozygous (0 or 2).
+    """
     het_mask = (geno == 1)
     if np.any(het_mask):
         random_choices = np.random.randint(0, 2, size=het_mask.sum()) * 2
@@ -562,6 +601,16 @@ def random_haploidise(geno):
     return geno
 
 def polarise(geno, snp_chunk, polarise_is_file=False, ind_data=None, config=None, sample_id=None):
+    """
+    Polarise SNPs to ancestral/derived orientation.
+    
+    Two modes:
+    1. File-based: Use ancestral allele annotations from file
+    2. Sample-based: Use a reference individual's alleles as ancestral
+    
+    Flips alleles so allele1 is always ancestral, allele2 is derived.
+    Removes SNPs where ancestral state cannot be determined.
+    """
     excluded_count = 0
     if polarise_is_file:
         snp_chunk = snp_chunk.copy()
@@ -675,6 +724,9 @@ def complement_snp_alleles(snp_data, snp_id_list, logger=logging):
 
 #### maf
 def filter_by_maf(geno, snp_chunk, min_maf=None, max_maf=None, config=None, ind_data=None):
+    """
+    Filter SNPs based on minor allele frequency (MAF) thresholds.
+    """
     if min_maf is None and max_maf is None:
         return geno, snp_chunk
 
@@ -693,6 +745,12 @@ def filter_by_maf(geno, snp_chunk, min_maf=None, max_maf=None, config=None, ind_
     return geno_filtered, snp_chunk_filtered
 
 def calculate_maf(geno, ind_data=None, snp_chunk=None, config=None, sex_chr_info=None):
+    """
+    Calculate minor allele frequency (MAF) for SNPs.
+    
+    Automatically detects and handles sex chromosomes.
+    Returns: maf, n_missing, valid_count, missing_rate, allele1_freq.
+    """
     n_ind = geno.shape[1]
 
     if sex_chr_info is None and snp_chunk is not None:
@@ -706,6 +764,9 @@ def calculate_maf(geno, ind_data=None, snp_chunk=None, config=None, sex_chr_info
         return _calculate_maf_sex_chr(geno, ind_data, snp_chunk, config, n_ind, sex_chr_info)
 
 def _calculate_maf_autosomal(geno, n_ind):
+    """
+    Calculate MAF for autosomal chromosomes.
+    """
     is_missing = (geno == 9)
     n_missing = np.sum(is_missing, axis=1)
     valid_count = n_ind - n_missing
@@ -722,6 +783,13 @@ def _calculate_maf_autosomal(geno, n_ind):
     return maf, n_missing, valid_count, missing_rate, allele1_freq
 
 def _calculate_maf_sex_chr(geno, ind_data, snp_chunk, config, n_ind, sex_chr_info):
+    """
+    Calculate MAF accounting for sex chromosomes (X and Y).
+    
+    - Y chromosome: only count males (haploid)
+    - X chromosome: males are haploid, females are diploid
+    - Heterozygous calls on Y and male X are treated as missing
+    """
     geno_processed = apply_sex_chr_missing(geno, snp_chunk, ind_data, config, sex_chr_info)
 
     x_indices = sex_chr_info['x_indices'] if sex_chr_info else np.array([])
@@ -760,6 +828,7 @@ def _calculate_maf_sex_chr(geno, ind_data, snp_chunk, config, n_ind, sex_chr_inf
         for i, snp_idx in enumerate(y_indices):
             y_geno_males = geno_processed[snp_idx, male_mask]
             y_geno_males_clean = y_geno_males.copy()
+            # convert heterozygous calls to missing
             y_geno_males_clean[y_geno_males_clean == 1] = 9
             is_missing_y = (y_geno_males_clean == 9)
             n_missing_y = np.sum(is_missing_y)
@@ -855,6 +924,9 @@ def _calculate_maf_sex_chr(geno, ind_data, snp_chunk, config, n_ind, sex_chr_inf
 
 #### geno
 def filter_by_geno(geno, snp_chunk, geno_threshold, config=None, ind_data=None):
+    """
+    Filter SNPs based on missing genotype rate threshold.
+    """
     if (config is not None and not config.ignore_sex_chr and
             ind_data is not None and snp_chunk is not None):
         sex_chr_info = _get_sex_chr_info(snp_chunk, config)
@@ -868,6 +940,9 @@ def filter_by_geno(geno, snp_chunk, geno_threshold, config=None, ind_data=None):
         return _filter_by_geno_sex_chr(geno, snp_chunk, geno_threshold, config, ind_data)
 
 def _filter_by_geno_autosomal(geno, snp_chunk, geno_threshold, config):
+    """
+    Filter SNPs by missing rate for autosomal chromosomes.
+    """
     n_ind = geno.shape[1]
     is_missing = (geno == 9)
     n_missing = np.sum(is_missing, axis=1)
@@ -878,6 +953,9 @@ def _filter_by_geno_autosomal(geno, snp_chunk, geno_threshold, config):
     return geno_filtered, snp_chunk_filtered
 
 def _filter_by_geno_sex_chr(geno, snp_chunk, geno_threshold, config, ind_data):
+    """
+    Filter SNPs by missing rate for sex chromosomes.    
+    """
     n_ind = geno.shape[1]
     sex_chr_info = _get_sex_chr_info(snp_chunk, config)
     geno_processed = apply_sex_chr_missing(geno, snp_chunk, ind_data, config, sex_chr_info)
@@ -954,6 +1032,10 @@ def _filter_by_geno_sex_chr(geno, snp_chunk, geno_threshold, config, ind_data):
 
 #### missing
 def calculate_ind_missing(geno, ind_data=None, snp_chunk=None, config=None):
+    """
+    Calculate per-individual missing genotype counts.
+    Excludes Y for females, counts hets as missing on Y chr.
+    """
     if (config is not None and not config.ignore_sex_chr and
             ind_data is not None and snp_chunk is not None):
         sex_chr_info = _get_sex_chr_info(snp_chunk, config)
@@ -967,12 +1049,20 @@ def calculate_ind_missing(geno, ind_data=None, snp_chunk=None, config=None):
         return _calculate_ind_missing_sex_chr(geno, ind_data, snp_chunk, config)
 
 def _calculate_ind_missing_autosomal(geno):
+    """
+    Calculate per-individual missing counts for autosomal chromosomes.
+    """
     is_valid = (geno != 9)
     n_snps = np.sum(is_valid, axis=0)
     n_missing = geno.shape[0] - n_snps
     return n_snps, n_missing
 
 def _calculate_ind_missing_sex_chr(geno, ind_data, snp_chunk, config):
+    """
+    Calculate per-individual missing counts for sex chromosomes.
+    
+    Excludes Y SNPs from female counts, treats hets as missing on Y chr.
+    """
     original_geno = geno
     sex_chr_info = _get_sex_chr_info(snp_chunk, config)
 
@@ -1060,6 +1150,9 @@ def _calculate_ind_missing_sex_chr(geno, ind_data, snp_chunk, config):
 
 #### freq
 def calculate_snp_stats(geno, snp_chunk, ind_data=None, config=None):
+    """
+    Calculate SNP statistics.
+    """
     if (config is not None and not config.ignore_sex_chr and
             ind_data is not None and snp_chunk is not None):
         sex_chr_info = _get_sex_chr_info(snp_chunk, config)

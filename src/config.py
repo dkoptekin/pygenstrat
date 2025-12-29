@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import os
 import logging
+import numpy as np
 
 @dataclass
 class EigenConfig:
@@ -31,6 +32,7 @@ class EigenConfig:
     genetic_distance: str = None
     map_unit: str = "cM"
     random_haploidise: bool = False
+    seed: int = None
     polarise: str = None
     sex_chr: list = None
     ignore_sex_chr: bool = False
@@ -52,6 +54,7 @@ class EigenConfig:
         if not self.prefix:
             raise ValueError("Input prefix must be provided (--prefix)")
 
+        # Sex chromosome IDs: X -> 23, Y -> 24 (standard EIGENSTRAT encoding)
         if self.sex_chr is None:
             self.sex_chr = ['23', '24']
 
@@ -133,10 +136,7 @@ class EigenConfig:
         
         if self.map_unit and self.map_unit not in ["cM", "M"]:
             raise ValueError(f"map_unit must be either 'cM' or 'M'")
-        
-        if self.map_unit and not self.genetic_distance:
-            raise ValueError("--map-unit can only be used together with --genetic-distance (must specify a genetic map file or 'zero')")
-        
+
         if self.genetic_distance and self.map_unit == "cM":
             logging.info("Genetic distance output unit: centiMorgans (cM)")
         elif self.genetic_distance and self.map_unit == "M":
@@ -168,7 +168,15 @@ class EigenConfig:
         if self.sex_chr_missing:
             logging.info(
                 "Sex chromosome filtering enabled: female genotypes will be set to missing for Y chromosome SNPs and male heterozygous genotypes will be set to missing for X chromosome SNPs")
-
+        
+        # seed for random haploidisation
+        if self.random_haploidise:
+            if self.seed is None:
+                # Generate random seed if not provided
+                self.seed = np.random.randint(1, 2**32 - 1)
+                logging.info(f"Random haploidisation seed: {self.seed}")
+        elif self.seed is not None:
+            logging.warning("--seed option specified without --random-haploidise. Seed will be ignored.")
 
 def _check_file_exists(file_path, description, allow_zero=False):
     if file_path and file_path != "zero" and not os.path.exists(file_path):

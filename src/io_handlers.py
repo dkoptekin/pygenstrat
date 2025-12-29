@@ -58,6 +58,7 @@ class EigenstratReader:
                     if actual_rows == 0:
                         break
 
+                    # Unpack binary genotype data: 2 bits per genotype (00=0, 01=1, 10=2, 11=9)
                     chunk = np.frombuffer(chunk_data[:actual_rows * self.row_len], dtype='uint8').reshape(actual_rows, self.row_len)
                     unpacked = np.unpackbits(chunk, axis=1)[:, :(2 * self.n_ind)]
                     genotypes = 2 * unpacked[:, ::2] + unpacked[:, 1::2]
@@ -148,6 +149,8 @@ class OutputHandler:
             mode = 'ab'
             with open(outname, mode) as f:
                 packed_data = np.zeros((nSnp, rLen), dtype=np.uint8)
+                # Pack genotypes into binary format
+                # 0 -> 00, 1 -> 01, 2 -> 10, 9 -> 11
                 for snp_idx in range(nSnp):
                     genotypes = geno[snp_idx].copy()
                     genotypes[genotypes == 9] = 3

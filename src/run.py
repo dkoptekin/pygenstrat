@@ -41,6 +41,15 @@ from .processors import (
     log_polarisation)
 
 class EigenDataset:
+    """
+    Main class
+    
+    Handles:
+    - Loading genotype, SNP, and individual data
+    - Applying updates (population names, SNP IDs, genetic distances)
+    - Processing data in chunks to manage memory
+    - Applying filters and transformations
+    """
     def __init__(self, config: EigenConfig):
         self.config = config
         self.config.validate_parameters()
@@ -50,6 +59,8 @@ class EigenDataset:
         log_sample_sex_counts(self.ind_data, logger=logging)
         self.genetic_distances_updated = False
         self.ind_data, self.snp_data, _ = apply_update(self.ind_data, self.snp_data, self.config, in_place=False)
+        if config.random_haploidise and config.seed is not None:
+            np.random.seed(config.seed)
         if hasattr(config, 'interpolators') and config.interpolators is not None:
             self.interpolators = config.interpolators
             if config.out is not None:
@@ -90,6 +101,14 @@ class EigenDataset:
                     f"Filtering will be applied appropriately for each chromosome. If you want to ignore sex chromosomes use --ignore-sex-chr flag")
 
     def process_chunks(self) -> tuple:
+        """
+        Process genotype data in chunks.
+        
+        Workflow:
+        1. Filter individuals/SNPs based on input files.
+        2. For each chunk: apply filters, calculate stats, write outputs
+        3. Finalize outputs and log summaries
+        """
         chunk_count = 0
         total_processed_snps = 0
         final_n_snps = 0
@@ -205,6 +224,18 @@ class EigenDataset:
         return None
 
     def _apply_filters_to_chunk(self, geno_chunk, snp_chunk, start_idx, end_idx, indv_mask, snp_filter_mask, pol_df, snp_annot_full, is_polarise_file, regions, chromosomes, random_haploidise_diploid_mask):
+        """
+        Apply all filtering and transformation operations to a genotype chunk.
+        
+        Order of operations:
+        1. Polarisation (if specified)
+        2. Random haploidisation (if specified)
+        3. Sex chromosome missing data handling
+        4. Individual filtering
+        5. SNP filtering (ID, region, chromosome)
+        6. Genotype missingness filter (--geno)
+        7. MAF filter (--min-maf, --max-maf)
+        """
         config = self.config
         if config.polarise:
             if is_polarise_file:

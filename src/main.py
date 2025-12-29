@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 from .config import EigenConfig
 from .run import EigenDataset
 from .processors import (
@@ -62,6 +63,8 @@ def parse_args():
                         help='File containing SNP IDs (one per line) whose alleles should be complemented (e.g., A<->T, C<->G) in the SNP file.')
     parser.add_argument('--random-haploidise', action='store_true',
                         help='Convert heterozygous genotypes to homozygous at random')
+    parser.add_argument('--seed', type=int,
+                        help='Random seed for reproducibility (used with --random-haploidise). If not specified, a random seed will be generated.')
     parser.add_argument('--polarise', type=str,
                         help='Polarisation reference: either a two-column file mapping snpID to ancestral_allele, or a sample ID from the dataset to use as ancestral reference (makes allele1 ancestral and allele2 derived).')
 
@@ -108,12 +111,23 @@ def parse_args():
     parser.add_argument('--verbose', action='store_true',
                         help='Output detailed logs about removed SNPs and individuals')
 
+    # If no arguments provided, print help and exit
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+    
     args = parser.parse_args()
     return args
 
 def main():
-
-    print("pygenstrat running")
+    """
+    Main
+    
+    Determines operation mode:
+    - Update-only (in-place): Apply updates without filters/stats
+    - Processing: Load data, apply filters/transforms, write outputs
+    - Simple conversion: Convert between EIGENSTRAT formats (anc/eig)
+    """
 
     logging.basicConfig(
         level=logging.INFO,
@@ -125,6 +139,9 @@ def main():
     try:
         args = parse_args()
         args_dict = vars(args)
+        
+        # Print running message after argument parsing (avoids showing for --help/--version)
+        print("pygenstrat running")
         
         has_updates = args.update_ind or args.update_snp or args.genetic_distance or args.flip_strand
         has_stats = args.missing or args.missing_by_chr or args.freq
@@ -146,6 +163,7 @@ def main():
             args.polarise,
             args.sex_chr_missing])
         is_simple_conversion = args.out_type is not None and not has_updates and not has_stats and not has_filters
+        # Determine if output files should be written
         should_write_output = has_filters or is_simple_conversion or (has_updates and args.out is not None)
         
         if is_simple_conversion and args.out is None:
