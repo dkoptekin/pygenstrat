@@ -144,21 +144,11 @@ class EigenDataset:
                 self.config.keep_snps, self.config.remove_snps
             ])
             if needs_snp_static_mask:
-                snp_mask_file = self.config.remove_snps if self.config.remove_snps else self.config.keep_snps
-                snp_filter_set = set(np.loadtxt(snp_mask_file, dtype=str))
-                mask_values = self.snp_data['snpID'].isin(snp_filter_set).values
-                if self.config.keep_snps:
-                    snp_mask = mask_values
-                else:
-                    snp_mask = ~mask_values
-
-                if snp_mask.sum() > 0:
-                    self.snp_data = self.snp_data.loc[snp_mask].reset_index(drop=True)
-                else:
-                    logging.warning(f"All SNPs filtered out by SNP ID static filtering - output will be empty.")
+                snp_filter_mask = self._create_snp_filter_mask()
+                if snp_filter_mask is not None and snp_filter_mask.sum() == 0:
+                    logging.warning(f"All SNPs filtered out by SNP ID filtering - output will be empty.")
 
             output = OutputHandler(self.config, self.ind_data)
-            snp_filter_mask = None
             regions = self._load_regions()
             chromosomes = self._load_chromosomes()
             if self.config.polarise and os.path.isfile(str(self.config.polarise)):
