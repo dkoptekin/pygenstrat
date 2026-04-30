@@ -423,3 +423,6 @@ pygenstrat --prefix /path/to/input/basename --random-haploidise --out /path/to/o
 | `.removed.snp`  | List of filtered SNPs with reasons (if --verbose used)                                                   |
 | `.backup`       | Backup of original file (when using update options)                                                      |
 
+## Citation
+
+[Koptekin 2026, Bioinformatics Advances](https://doi.org/10.1093/bioadv/vbag022)
