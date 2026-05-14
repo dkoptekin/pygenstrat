@@ -1,4 +1,4 @@
-# pygenstrat
+![logo](pygenstrat.png)
 
 A Python package for handling and processing EIGENSTRAT datasets with advanced performance features and configurable options.
 
